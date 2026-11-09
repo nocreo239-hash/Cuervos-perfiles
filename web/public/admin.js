@@ -163,23 +163,38 @@ function pintarPerfiles() {
       el("td", {}, vence),
       el("td", { class: "chico apagado" }, p.publicado ? Comun.fecha(p.publicado) : "—"),
       el("td", {}, el("div", { class: "fila", style: "justify-content:flex-end; flex-wrap:nowrap" },
-        el("button", { type: "button", onclick: () => nuevoCodigo(p) }, "Código nuevo"),
+        el("button", { type: "button", title: "El código viejo deja de servir, en la página y en el mapa", onclick: ev => dosToques(ev.currentTarget, () => nuevoCodigo(p)) }, "Código nuevo"),
         el("button", { type: "button", onclick: () => editar(p.id, { activo: !p.activo }, p.activo ? "Perfil desactivado" : "Perfil activado") }, p.activo ? "Desactivar" : "Activar")))));
   }
 }
 
+// Sin ventanas de confirmar (el navegador de la app las bloquea): el primer toque pregunta, el segundo hace.
+function dosToques(boton, accion) {
+  if (boton.dataset.seguro) { delete boton.dataset.seguro; boton.textContent = boton.dataset.texto; boton.classList.remove("peligro"); accion(); return; }
+  boton.dataset.texto = boton.textContent;
+  boton.dataset.seguro = "1";
+  boton.textContent = "¿Seguro? Toca otra vez";
+  boton.classList.add("peligro");
+  setTimeout(() => { if (boton.dataset.seguro) { delete boton.dataset.seguro; boton.textContent = boton.dataset.texto; boton.classList.remove("peligro"); } }, 5000);
+}
+
 async function editar(id, cambios, ok) {
-  try { const d = await api("POST", `perfil/${id}/editar`, cambios); aviso(ok + (d.listaCambiada ? " · lista del mapa actualizada" : "")); await cargar(); }
+  try {
+    const d = await api("POST", `perfil/${id}/editar`, cambios);
+    await cargar();
+    if (d.listaError) aviso(ok + ", pero no se pudo actualizar la lista del mapa: " + d.listaError + ". Toca «Rehacer lista» cuando se arregle.", "mal");
+    else aviso(ok + (d.listaCambiada ? " · lista del mapa actualizada" : ""));
+  }
   catch (x) { aviso(x.message, "mal"); }
 }
 
 async function nuevoCodigo(p) {
-  if (!confirm(`¿Sacar un código nuevo para el perfil ${p.id} (${p.nombre})? El código viejo deja de servir, en la página y en el mapa.`)) return;
   try {
     const d = await api("POST", `perfil/${p.id}/codigo`);
     document.querySelector('[data-p="pPerfiles"]').click();
     mostrarCodigo(p.id, d.codigo, "Código nuevo");
     await cargar();
+    if (d.listaError) aviso("El código cambió, pero no se pudo actualizar la lista del mapa: " + d.listaError + ". Toca «Rehacer lista» cuando se arregle.", "mal");
   } catch (x) { aviso(x.message, "mal"); }
 }
 

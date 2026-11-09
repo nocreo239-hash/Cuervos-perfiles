@@ -20,6 +20,14 @@ $("fEntrada").addEventListener("submit", async ev => {
 $("codigo").addEventListener("input", () => { $("codigo").value = $("codigo").value.replace(/\D/g, "").slice(0, 8); });
 $("salir").addEventListener("click", () => { Comun.guardar("codigo", null); location.reload(); });
 
+// Mensaje en la página (sin ventanas emergentes, que algunos navegadores bloquean).
+function avisar(t) {
+  const d = el("div", { class: "aviso mal" }, t);
+  $("estado").prepend(d);
+  d.scrollIntoView({ behavior: "smooth", block: "center" });
+  setTimeout(() => d.remove(), 12000);
+}
+
 function mostrarError(t) { const e = $("errEntrada"); e.textContent = t; e.classList.remove("oculto"); }
 
 async function entrar(c, silencioso) {
@@ -146,10 +154,10 @@ function elegir(e) { _destino = e; $("archivo").value = ""; $("archivo").click()
 $("archivo").addEventListener("change", () => { const f = $("archivo").files[0]; if (f && _destino) cargarArchivo(_destino, f); });
 
 async function cargarArchivo(e, f) {
-  if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return alert("Usa una foto JPG, PNG o WEBP.");
+  if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return avisar("Usa una foto JPG, PNG o WEBP.");
   const url = URL.createObjectURL(f);
   const img = await Comun.imagen(url);
-  if (!img) return alert("No pude abrir esa foto. Prueba con otra (JPG o PNG).");
+  if (!img) return avisar("No pude abrir esa foto. Prueba con otra (JPG o PNG).");
   abrirEditor(e, img, null);
 }
 
@@ -272,7 +280,7 @@ $("enviar").addEventListener("click", async () => {
     await refrescar(); pintarPlano(); actualizarCuenta();
     window.scrollTo({ top: 0, behavior: "smooth" });
   } catch (e) {
-    alert(e.message);
+    avisar(e.message);
   } finally {
     b.textContent = "Enviar para aprobación"; actualizarCuenta();
   }

@@ -260,9 +260,13 @@ async function nuevoCodigo(env, id) {
   if (!per) fallo("No existe ese perfil", 404);
   const { codigo, cifrado } = await codigoLibre(env, MUNDOS[per.mundo]);
   await env.DB.prepare("UPDATE perfiles SET cifrado = ? WHERE id = ?").bind(cifrado, id).run();
-  let cambio = false;
-  if (per.publicado) cambio = await publicarLista(env, per.mundo, `Nuevo código para el perfil ${id}`);
-  return json({ ok: true, codigo, listaCambiada: cambio });
+  // el código ya cambió: aunque falle GitHub hay que devolverlo, o nadie lo sabría
+  let cambio = false, listaError = null;
+  if (per.publicado) {
+    try { cambio = await publicarLista(env, per.mundo, `Nuevo código para el perfil ${id}`); }
+    catch (e) { listaError = String(e.message || e); }
+  }
+  return json({ ok: true, codigo, listaCambiada: cambio, listaError });
 }
 
 async function editarPerfil(req, env, id) {
@@ -274,9 +278,12 @@ async function editarPerfil(req, env, id) {
   const activo = b.activo !== undefined ? (b.activo ? 1 : 0) : per.activo;
   const nota = b.nota !== undefined ? (b.nota ? String(b.nota).slice(0, 200) : null) : per.nota;
   await env.DB.prepare("UPDATE perfiles SET nombre = ?, vence = ?, activo = ?, nota = ? WHERE id = ?").bind(nombre, vence, activo, nota, id).run();
-  let cambio = false;
-  if (per.publicado && (activo !== per.activo || vence !== per.vence)) cambio = await publicarLista(env, per.mundo, `Perfil ${id} ${activo ? "activo" : "desactivado"}`);
-  return json({ ok: true, listaCambiada: cambio });
+  let cambio = false, listaError = null;
+  if (per.publicado && (activo !== per.activo || vence !== per.vence)) {
+    try { cambio = await publicarLista(env, per.mundo, `Perfil ${id} ${activo ? "activo" : "desactivado"}`); }
+    catch (e) { listaError = String(e.message || e); }
+  }
+  return json({ ok: true, listaCambiada: cambio, listaError });
 }
 
 async function hojaEnvio(env, id, h) {
