@@ -120,6 +120,7 @@ async function api(req, env, url) {
   if (p === "/api/entrar" && m === "POST") return entrar(req, env);
   if (p === "/api/estado" && m === "GET") return estado(req, env);
   if (p === "/api/envio" && m === "POST") return enviar(req, env);
+  if (p.startsWith("/api/envio/hoja/") && m === "GET") return hojaPropia(req, env, +p.split("/").pop());
 
   // ---- admin
   if (p.startsWith("/api/admin/")) {
@@ -221,6 +222,16 @@ async function enviar(req, env) {
   for (let h = 0; h < cfg.hojas; h++)
     await env.ENVIOS.put(`envios/${id}_${h}.jpg`, hojas[h], { httpMetadata: { contentType: "image/jpeg" } });
   return json({ ok: true, envio: id });
+}
+
+/** El cliente ve sus propias hojas pendientes (para recordar qué mandó y dónde). */
+async function hojaPropia(req, env, h) {
+  const per = await clienteDe(req, env);
+  const e = await env.DB.prepare("SELECT id FROM envios WHERE perfil = ? AND estado = 'pendiente' ORDER BY id DESC LIMIT 1").bind(per.id).first();
+  if (!e) fallo("No tienes fotos esperando revisión", 404);
+  const o = await env.ENVIOS.get(`envios/${e.id}_${h}.jpg`);
+  if (!o) fallo("No encontré esa hoja", 404);
+  return new Response(o.body, { headers: { "content-type": "image/jpeg", "cache-control": "private, no-store" } });
 }
 
 // ------------------------------------------------------------ admin

@@ -92,6 +92,9 @@ button:disabled { opacity: .5; cursor: default; }
 .espacio .acciones { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--linea); }
 .espacio .acciones button { flex: 1; padding: 8px; }
 .etiqueta { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--panel2); border: 1px solid var(--linea); color: var(--apagado); }
+.etiqueta.espera { background: #3a2c12; border-color: #8a6a2c; color: #f3d38c; }
+.espacio.espera { border-color: #8a6a2c; }
+.plano .punto.espera { background: #4a3810; border-color: #f0c66a; color: #fff3d6; }
 .etiqueta.nueva { background: var(--rojo); border-color: var(--rojo); color: #fff; }
 
 /* barra de abajo */

@@ -8,6 +8,8 @@ let codigo = null;      // el que puso al entrar
 let info = null;        // respuesta de /api/estado
 let lay = null;         // layout del mundo (espacios con su hoja y rectángulo)
 const elegidas = {};    // id -> { img, z, cx, cy }
+let pendientes = null;  // hojas del envío que espera revisión: [url0, url1], o null
+let enRevision = [];    // cuadros de ese envío
 
 // ------------------------------------------------------------ entrar / salir
 
@@ -54,13 +56,31 @@ async function entrar(c, silencioso) {
     $("vEntrada").classList.add("oculto");
     $("vPerfil").classList.remove("oculto");
     $("barra").classList.remove("oculto");
+    await cargarPendientes();
     pintarEstado(); pintarPlano(); pintarEspacios(); actualizarCuenta();
   } catch (e) { mostrarError("No hay conexión con el servidor. Intenta otra vez."); }
 }
 
 async function refrescar() {
   const r = await fetch("/api/estado", { headers: { "x-codigo": codigo } });
-  if (r.ok) { info = await r.json(); pintarEstado(); pintarEspacios(); }
+  if (r.ok) { info = await r.json(); await cargarPendientes(); pintarEstado(); pintarPlano(); pintarEspacios(); }
+}
+
+/** Si hay un envío esperando revisión, baja sus hojas para mostrar qué foto quedó en cada cuadro. */
+async function cargarPendientes() {
+  if (pendientes) pendientes.forEach(u => URL.revokeObjectURL(u));
+  pendientes = null; enRevision = [];
+  const u = info.ultimo;
+  if (!u || u.estado !== "pendiente") return;
+  try {
+    const urls = [];
+    for (let h = 0; h < lay.hojas; h++) {
+      const r = await fetch(`/api/envio/hoja/${h}`, { headers: { "x-codigo": codigo } });
+      if (!r.ok) return;
+      urls.push(URL.createObjectURL(await r.blob()));
+    }
+    pendientes = urls; enRevision = u.espacios.slice();
+  } catch (e) { pendientes = null; enRevision = []; }
 }
 
 // ------------------------------------------------------------ estado del último envío
@@ -70,7 +90,9 @@ function pintarEstado() {
   caja.innerHTML = "";
   const partes = [];
   if (u && u.estado === "pendiente")
-    partes.push(el("div", { class: "aviso espera" }, `Tus fotos del ${Comun.fecha(u.creado)} están esperando aprobación. Si mandas otras, reemplazan a esas.`));
+    partes.push(el("div", { class: "aviso espera" },
+      `Tus fotos del ${Comun.fecha(u.creado)} están esperando revisión: ${u.espacios.length === 1 ? "cuadro" : "cuadros"} ${u.espacios.join(", ")}. `,
+      el("span", { class: "chico apagado" }, "Si cambias otros cuadros, se suman a este envío.")));
   else if (u && u.estado === "aprobado")
     partes.push(el("div", { class: "aviso bien" }, `Tus fotos se aprobaron el ${Comun.fecha(u.revisado)}. Ya salen en las instancias nuevas que abras con tu código.`));
   else if (u && u.estado === "rechazado")
@@ -86,7 +108,8 @@ function pintarPlano() {
   p.append(el("img", { src: lay.plano, alt: "Plano del club" }));
   for (const e of lay.espacios)
     p.append(el("button", {
-      class: "punto" + (elegidas[e.id] ? " lista" : ""), type: "button", title: "Cuadro " + e.id,
+      class: "punto" + (elegidas[e.id] ? " lista" : enRevision.includes(e.id) ? " espera" : ""), type: "button",
+      title: "Cuadro " + e.id + (elegidas[e.id] ? " · foto nueva" : enRevision.includes(e.id) ? " · esperando revisión" : ""),
       style: `left:${e.u * 100}%; top:${e.v * 100}%`,
       onclick: () => document.getElementById("esp" + e.id).scrollIntoView({ behavior: "smooth", block: "center" }),
     }, String(e.id)));
@@ -107,14 +130,18 @@ function pintarEspacios() {
 function tarjeta(e) {
   const sel = elegidas[e.id];
   const vista = el("div", { class: "vista" });
+  const espera = !sel && pendientes && enRevision.includes(e.id);
   if (sel) vista.append(previa(e, sel));
+  else if (espera) vista.append(Comun.recorte(pendientes[e.hoja], e, lay.tam, 200, 330));
   else if (info.publicado) vista.append(Comun.recorte(urlHoja(e.hoja), e, lay.tam, 200, 330));
   else vista.append(el("div", { class: "vacio" }, "Todavía sin foto. Si lo dejas así, se verá con el logo del club."));
 
-  const t = el("article", { class: "espacio" + (sel ? " lista" : ""), id: "esp" + e.id },
+  const t = el("article", { class: "espacio" + (sel ? " lista" : espera ? " espera" : ""), id: "esp" + e.id },
     el("div", { class: "cab" },
       el("span", { class: "num" }, String(e.id)),
-      sel ? el("span", { class: "etiqueta nueva" }, "Nueva") : el("span", { class: "forma" }, forma(e) + (info.publicado ? " · la de ahora" : ""))),
+      sel ? el("span", { class: "etiqueta nueva" }, "Nueva")
+        : espera ? el("span", { class: "etiqueta espera" }, "Esperando revisión")
+        : el("span", { class: "forma" }, forma(e) + (info.publicado ? " · la de ahora" : ""))),
     vista,
     el("div", { class: "lugar" },
       el("img", { src: "/" + e.foto, alt: "Dónde está el cuadro " + e.id, onclick: () => verGrande("/" + e.foto) }),
@@ -255,7 +282,12 @@ async function armarHoja(h) {
   const ctx = c.getContext("2d");
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, lay.tam, lay.tam);
   const enHoja = lay.espacios.filter(e => e.hoja === h);
-  if (info.publicado) {
+  if (pendientes) {
+    // hay un envío esperando revisión: se parte de él, así sus fotos no se pierden
+    const base = await Comun.imagen(pendientes[h]);
+    if (!base) throw new Error("No pude cargar las fotos que tienes en revisión. Recarga la página e intenta otra vez.");
+    ctx.drawImage(base, 0, 0, lay.tam, lay.tam);
+  } else if (info.publicado) {
     // lo que no cambia se queda como está ahora
     const base = await Comun.imagen(`${info.hojas}${h}.jpg?t=${Date.now()}`, true);
     if (!base) throw new Error("No pude cargar tus fotos actuales para conservar las que no cambias. Intenta otra vez en un momento.");
@@ -283,7 +315,7 @@ $("enviar").addEventListener("click", async () => {
   try {
     await document.fonts.ready;
     const f = new FormData();
-    f.append("espacios", JSON.stringify(ids));
+    f.append("espacios", JSON.stringify([...new Set([...ids, ...enRevision])].sort((a, b) => a - b)));
     for (let h = 0; h < lay.hojas; h++) f.append("hoja" + h, await armarHoja(h), `hoja${h}.jpg`);
     b.textContent = "Enviando...";
     const r = await fetch("/api/envio", { method: "POST", headers: { "x-codigo": codigo }, body: f });
