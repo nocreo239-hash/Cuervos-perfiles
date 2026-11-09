@@ -1,0 +1,119 @@
+{
+ "plano": "casa/plano.jpg",
+ "espacios": [
+  {
+   "id": 1,
+   "u": 0.4846,
+   "v": 0.9656,
+   "foto": "casa/lugar/01.jpg"
+  },
+  {
+   "id": 2,
+   "u": 0.5471,
+   "v": 0.9656,
+   "foto": "casa/lugar/02.jpg"
+  },
+  {
+   "id": 3,
+   "u": 0.6144,
+   "v": 0.9656,
+   "foto": "casa/lugar/03.jpg"
+  },
+  {
+   "id": 4,
+   "u": 0.6721,
+   "v": 0.9656,
+   "foto": "casa/lugar/04.jpg"
+  },
+  {
+   "id": 5,
+   "u": 0.6933,
+   "v": 0.7567,
+   "foto": "casa/lugar/05.jpg"
+  },
+  {
+   "id": 6,
+   "u": 0.5442,
+   "v": 0.7567,
+   "foto": "casa/lugar/06.jpg"
+  },
+  {
+   "id": 7,
+   "u": 0.4865,
+   "v": 0.7567,
+   "foto": "casa/lugar/07.jpg"
+  },
+  {
+   "id": 8,
+   "u": 0.3115,
+   "v": 0.7433,
+   "foto": "casa/lugar/08.jpg"
+  },
+  {
+   "id": 9,
+   "u": 0.4558,
+   "v": 0.7433,
+   "foto": "casa/lugar/09.jpg"
+  },
+  {
+   "id": 10,
+   "u": 0.5135,
+   "v": 0.7433,
+   "foto": "casa/lugar/10.jpg"
+  },
+  {
+   "id": 11,
+   "u": 0.5712,
+   "v": 0.7433,
+   "foto": "casa/lugar/11.jpg"
+  },
+  {
+   "id": 12,
+   "u": 0.6288,
+   "v": 0.7433,
+   "foto": "casa/lugar/12.jpg"
+  },
+  {
+   "id": 13,
+   "u": 0.6865,
+   "v": 0.7433,
+   "foto": "casa/lugar/13.jpg"
+  },
+  {
+   "id": 14,
+   "u": 0.6644,
+   "v": 0.2011,
+   "foto": "casa/lugar/14.jpg"
+  },
+  {
+   "id": 15,
+   "u": 0.4192,
+   "v": 0.2011,
+   "foto": "casa/lugar/15.jpg"
+  },
+  {
+   "id": 16,
+   "u": 0.2931,
+   "v": 0.2486,
+   "foto": "casa/lugar/16.jpg"
+  },
+  {
+   "id": 17,
+   "u": 0.2931,
+   "v": 0.3389,
+   "foto": "casa/lugar/17.jpg"
+  },
+  {
+   "id": 18,
+   "u": 0.2931,
+   "v": 0.6722,
+   "foto": "casa/lugar/18.jpg"
+  },
+  {
+   "id": 19,
+   "u": 0.8163,
+   "v": 0.5767,
+   "foto": "casa/lugar/19.jpg"
+  }
+ ]
+}

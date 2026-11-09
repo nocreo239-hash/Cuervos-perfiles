@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel de perfiles · La Corte de los Cuervos</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<div class="envoltura">
+  <header class="cabecera">
+    <div class="sub">La Corte de los Cuervos</div>
+    <h1>Panel de perfiles de fotos</h1>
+  </header>
+
+  <section id="vClave" class="panel entrada">
+    <h2>Clave del panel</h2>
+    <form id="fClave">
+      <input id="clave" type="password" autocomplete="current-password" style="letter-spacing:normal; font-size:18px" aria-label="Clave">
+      <button class="primario" type="submit">Entrar</button>
+    </form>
+    <div id="errClave" class="aviso mal oculto"></div>
+  </section>
+
+  <section id="vPanel" class="oculto">
+    <div class="fila" style="justify-content:space-between">
+      <nav class="pestanas">
+        <button data-p="pEnvios" class="activa" type="button">Por aprobar <span id="nPend" class="etiqueta">0</span></button>
+        <button data-p="pPerfiles" type="button">Perfiles</button>
+        <button data-p="pHistorial" type="button">Historial</button>
+      </nav>
+      <div class="fila">
+        <button id="recargar" type="button">Actualizar</button>
+        <button id="salir" type="button">Salir</button>
+      </div>
+    </div>
+    <div id="msg"></div>
+
+    <div id="pEnvios"></div>
+
+    <div id="pPerfiles" class="oculto">
+      <div class="panel">
+        <h2>Nuevo perfil</h2>
+        <p class="apagado chico" style="margin-top:0">El nombre y la nota solo los ves tú; no se publican. Al crear sale un código nuevo: dáselo al cliente con el enlace de la página.</p>
+        <form id="fNuevo" class="fila">
+          <input id="nNombre" class="crece" type="text" placeholder="Nombre (cliente o evento)" maxlength="80" required>
+          <label class="fila apagado chico" style="gap:6px">Vence <input id="nVence" type="date" style="width:auto"></label>
+          <input id="nNota" class="crece" type="text" placeholder="Nota (opcional)" maxlength="200">
+          <button class="primario" type="submit">Crear perfil</button>
+        </form>
+        <div id="nuevoCodigo"></div>
+      </div>
+      <div class="panel" style="overflow-x:auto">
+        <div class="fila" style="justify-content:space-between">
+          <h2 style="margin:0">Perfiles</h2>
+          <button id="rehacerLista" type="button" title="Vuelve a publicar casa/lista.txt con los perfiles activos">Rehacer lista</button>
+        </div>
+        <table id="tPerfiles"></table>
+      </div>
+    </div>
+
+    <div id="pHistorial" class="oculto">
+      <div class="panel" style="overflow-x:auto"><table id="tHistorial"></table></div>
+    </div>
+  </section>
+</div>
+<script src="/comun.js"></script>
+<script src="/admin.js"></script>
+</body>
+</html>

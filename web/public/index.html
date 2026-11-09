@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perfil de fotos · La Corte de los Cuervos</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="/estilo.css">
+</head>
+<body>
+<div class="envoltura">
+  <header class="cabecera">
+    <div class="sub">La Corte de los Cuervos</div>
+    <h1>Tu perfil de fotos</h1>
+  </header>
+
+  <!-- 1. entrar -->
+  <section id="vEntrada" class="panel entrada">
+    <h2>Pon tu código</h2>
+    <p class="apagado chico">Es el mismo número que vas a poner en el teclado del mapa.</p>
+    <form id="fEntrada">
+      <input id="codigo" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••••••" aria-label="Código">
+      <button class="primario" type="submit">Entrar</button>
+    </form>
+    <div id="errEntrada" class="aviso mal oculto"></div>
+  </section>
+
+  <!-- 2. espacios -->
+  <section id="vPerfil" class="oculto">
+    <div id="estado"></div>
+
+    <div class="panel">
+      <div class="fila" style="justify-content:space-between">
+        <h2 style="margin:0">Cómo funciona</h2>
+        <button id="salir" type="button">Salir</button>
+      </div>
+      <ol class="apagado" style="margin:.6em 0 0; padding-left: 1.2em">
+        <li>Elige una foto para cada cuadro que quieras cambiar (puedes arrastrarla encima). Ajusta qué parte se ve.</li>
+        <li>Toca <b style="color:var(--texto)">Enviar para aprobación</b>. Los cuadros que no toques se quedan como están.</li>
+        <li>Cuando el dueño del mapa lo apruebe, tus fotos salen en la <b style="color:var(--texto)">próxima instancia</b> que abras con tu código (unos minutos después).</li>
+      </ol>
+    </div>
+
+    <div class="panel">
+      <h2>Dónde está cada cuadro</h2>
+      <p class="apagado chico" style="margin-top:0">Plano del club visto desde arriba. Toca un número para ir a ese cuadro.</p>
+      <div id="plano" class="plano"></div>
+    </div>
+
+    <div id="rejilla" class="rejilla"></div>
+  </section>
+</div>
+
+<div id="barra" class="barra oculto">
+  <div class="envoltura">
+    <div><b id="cuenta">0 fotos</b> <span class="apagado chico" id="cuentaNota">listas para enviar</span></div>
+    <button id="enviar" class="primario" type="button" disabled>Enviar para aprobación</button>
+  </div>
+</div>
+
+<!-- editor de recorte -->
+<div id="velo" class="velo oculto">
+  <div class="editor">
+    <div class="fila" style="justify-content:space-between; margin-bottom:10px">
+      <h2 id="edTitulo" style="margin:0">Cuadro</h2>
+      <span class="apagado chico">Arrastra para mover · rueda o barra para acercar</span>
+    </div>
+    <div class="lienzo"><canvas id="edLienzo"></canvas></div>
+    <div class="fila" style="margin-top:12px">
+      <span class="apagado chico">Acercar</span>
+      <input id="edZoom" class="crece" type="range" min="1" max="4" step="0.01" value="1">
+    </div>
+    <div class="fila" style="margin-top:12px; justify-content:flex-end">
+      <button id="edCancelar" type="button">Cancelar</button>
+      <button id="edListo" class="primario" type="button">Listo</button>
+    </div>
+  </div>
+</div>
+
+<div id="veloFoto" class="velo oculto grande"><img alt=""></div>
+<input id="archivo" type="file" accept="image/jpeg,image/png,image/webp" class="oculto">
+
+<script src="/comun.js"></script>
+<script src="/cliente.js"></script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+# Cuervos perfiles: página de los clientes + panel de aprobación
+name = "cuervos-perfiles"
+main = "src/index.js"
+compatibility_date = "2025-10-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+html_handling = "drop-trailing-slash"
+
+[vars]
+GITHUB_REPO = "nocreo239-hash/Cuervos-perfiles"
+GITHUB_RAMA = "main"
+PAGES_BASE = "https://nocreo239-hash.github.io/Cuervos-perfiles/"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "cuervos-perfiles"
+database_id = "PENDIENTE"
+
+[[r2_buckets]]
+binding = "ENVIOS"
+bucket_name = "cuervos-perfiles-envios"
+
+# una vez al día saca de la lista los perfiles vencidos
+[triggers]
+crons = ["17 9 * * *"]
+
+# Secretos (se ponen en Cloudflare, nunca aquí): ADMIN_CLAVE, GITHUB_TOKEN
