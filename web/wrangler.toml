@@ -16,7 +16,7 @@ PAGES_BASE = "https://nocreo239-hash.github.io/Cuervos-perfiles/"
 [[d1_databases]]
 binding = "DB"
 database_name = "cuervos-perfiles"
-database_id = "PENDIENTE"
+database_id = "3966150e-cea3-4608-a73e-795785ad95d2"
 
 [[r2_buckets]]
 binding = "ENVIOS"
