@@ -29,14 +29,19 @@ function aviso(t, tipo = "bien") {
 
 $("fClave").addEventListener("submit", async ev => {
   ev.preventDefault();
-  clave = $("clave").value;
-  try { await cargar(); Comun.guardar("clave", clave); } catch (e) { if (e.message !== "401") { $("errClave").textContent = e.message; $("errClave").classList.remove("oculto"); } }
+  clave = $("clave").value.trim();
+  const boton = $("fClave").querySelector("button");
+  if (boton.disabled) return;
+  boton.disabled = true;
+  try { await cargar(); Comun.guardar("clave", clave); $("clave").value = ""; } catch (e) { if (e.message !== "401") { $("errClave").textContent = e.message; $("errClave").classList.remove("oculto"); } }
+  finally { boton.disabled = false; }
 });
 $("salir").addEventListener("click", () => salir());
 $("recargar").addEventListener("click", () => cargar());
 
 function salir(motivo) {
   Comun.guardar("clave", null); clave = null;
+  $("clave").value = "";
   $("vPanel").classList.add("oculto"); $("vClave").classList.remove("oculto");
   if (motivo) { $("errClave").textContent = motivo; $("errClave").classList.remove("oculto"); }
 }

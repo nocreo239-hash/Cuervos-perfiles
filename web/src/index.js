@@ -123,9 +123,9 @@ async function api(req, env, url) {
 
   // ---- admin
   if (p.startsWith("/api/admin/")) {
-    const clave = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const clave = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
     if (!env.ADMIN_CLAVE) fallo("Falta el secreto ADMIN_CLAVE en Cloudflare", 500);
-    if (!iguales(clave, env.ADMIN_CLAVE)) { await esperar(800); fallo("Clave incorrecta", 401); }
+    if (!iguales(clave, String(env.ADMIN_CLAVE).trim())) { await esperar(800); fallo("Clave incorrecta", 401); }
     const r = p.slice("/api/admin/".length).split("/");
     if (r[0] === "resumen" && m === "GET") return resumen(env);
     if (r[0] === "perfil" && r.length === 1 && m === "POST") return crearPerfil(req, env);
