@@ -142,8 +142,7 @@ function urlHoja(h) { return publicadas ? publicadas[h] : `${info.hojas}${h}.jpg
 
 /** Este cuadro tiene una foto aprobada (ya está en el mapa). */
 function aprobada(id) {
-  if (!info.publicado) return false;
-  return info.aprobados ? info.aprobados.includes(id) : true;   // perfiles de antes: todo lo publicado
+  return !!info.publicado && (info.aprobados || []).includes(id);
 }
 
 function forma(e) {

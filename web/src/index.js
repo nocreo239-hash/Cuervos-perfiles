@@ -190,13 +190,25 @@ async function entrar(req, env) {
 
 async function estado(req, env) { return datosCliente(env, await clienteDe(req, env)); }
 
+/** Cuadros con foto aprobada. Para perfiles aprobados antes de guardarlo, se rehace con el historial. */
+async function aprobadosDe(env, per) {
+  if (per.aprobados) return JSON.parse(per.aprobados);
+  if (!per.publicado) return [];
+  const filas = (await env.DB.prepare("SELECT espacios, rechazados FROM envios WHERE perfil = ? AND estado = 'aprobado'").bind(per.id).all()).results;
+  const ya = new Set();
+  for (const f of filas) { const no = JSON.parse(f.rechazados || "[]"); for (const n of JSON.parse(f.espacios)) if (!no.includes(n)) ya.add(n); }
+  const lista = [...ya].sort((a, b) => a - b);
+  if (filas.length) await env.DB.prepare("UPDATE perfiles SET aprobados = ? WHERE id = ?").bind(JSON.stringify(lista), per.id).run();
+  return lista;
+}
+
 async function datosCliente(env, per) {
   if (!per.activo) fallo("Este perfil está desactivado. Habla con el dueño del mapa.", 403);
   if (per.vence && per.vence < hoy()) fallo("Este perfil venció el " + per.vence + ".", 403);
   const ult = await env.DB.prepare("SELECT id, estado, espacios, rechazados, creado, revisado, nota FROM envios WHERE perfil = ? ORDER BY id DESC LIMIT 1").bind(per.id).first();
   return json({
     perfil: per.id, mundo: per.mundo, vence: per.vence, publicado: per.publicado,
-    aprobados: per.aprobados ? JSON.parse(per.aprobados) : null,
+    aprobados: await aprobadosDe(env, per),
     hojas: (env.PAGES_BASE || "") + `${per.mundo}/p/${String(per.id).padStart(4, "0")}_`,
     ultimo: ult ? { ...ult, espacios: JSON.parse(ult.espacios), rechazados: JSON.parse(ult.rechazados || "[]") } : null,
   });
@@ -369,7 +381,7 @@ async function aprobar(req, env, id) {
   for (let h = 0; h < cfg.hojas; h++)
     await env.ENVIOS.put(`publicadas/${e.perfil}_${h}.jpg`, hojas[h], { httpMetadata: { contentType: "image/jpeg" } });
   const per = await env.DB.prepare("SELECT aprobados FROM perfiles WHERE id = ?").bind(e.perfil).first();
-  const ya = new Set(per && per.aprobados ? JSON.parse(per.aprobados) : []);
+  const ya = new Set(await aprobadosDe(env, { ...(await env.DB.prepare("SELECT * FROM perfiles WHERE id = ?").bind(e.perfil).first()), aprobados: per && per.aprobados }));
   for (const n of espacios) if (!rechazados.includes(n)) ya.add(n);
   await env.DB.prepare("UPDATE perfiles SET aprobados = ? WHERE id = ?").bind(JSON.stringify([...ya].sort((a, b) => a - b)), e.perfil).run();
   for (let h = 0; h < cfg.hojas; h++) await env.ENVIOS.delete(`envios/${id}_${h}.jpg`);
