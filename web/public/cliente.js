@@ -13,11 +13,17 @@ const elegidas = {};    // id -> { img, z, cx, cy }
 
 $("fEntrada").addEventListener("submit", async ev => {
   ev.preventDefault();
-  const c = $("codigo").value.replace(/\D/g, "");
+  const c = $("codigo").value.trim();
   if (c.length < 4) return mostrarError("Escribe el código completo.");
-  await entrar(c);
+  const b = $("fEntrada").querySelector("button[type=submit]");
+  if (b.disabled) return;
+  b.disabled = true;
+  try { await entrar(c); } finally { b.disabled = false; }
 });
-$("codigo").addEventListener("input", () => { $("codigo").value = $("codigo").value.replace(/\D/g, "").slice(0, 8); });
+$("ver").addEventListener("click", () => {
+  const i = $("codigo"), ver = i.type === "password";
+  i.type = ver ? "text" : "password"; $("ver").textContent = ver ? "Ocultar" : "Ver"; i.focus();
+});
 $("salir").addEventListener("click", () => { Comun.guardar("codigo", null); location.reload(); });
 
 // Mensaje en la página (sin ventanas emergentes, que algunos navegadores bloquean).
@@ -35,6 +41,13 @@ async function entrar(c, silencioso) {
     const r = await fetch("/api/entrar", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ codigo: c }) });
     const d = await r.json();
     if (!r.ok) { if (!silencioso) mostrarError(d.error || "No se pudo entrar"); Comun.guardar("codigo", null); return; }
+    if (d.admin) {   // era la clave del panel
+      $("codigo").value = "";
+      Comun.guardar("codigo", null); Comun.guardar("clave", c);
+      location.href = "/admin";
+      return;
+    }
+    $("codigo").value = "";
     codigo = c; info = d;
     Comun.guardar("codigo", c);
     lay = await Comun.datos(info.mundo);

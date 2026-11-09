@@ -13,7 +13,7 @@ async function api(metodo, ruta, cuerpo) {
     headers: { authorization: "Bearer " + clave, ...(cuerpo ? { "content-type": "application/json" } : {}) },
     body: cuerpo ? JSON.stringify(cuerpo) : undefined,
   });
-  if (r.status === 401) { salir("La clave no es correcta."); throw new Error("401"); }
+  if (r.status === 401) { salir(); throw new Error("401"); }
   const d = r.headers.get("content-type")?.includes("json") ? await r.json() : r;
   if (!r.ok) throw new Error(d.error || "Error " + r.status);
   return d;
@@ -25,25 +25,16 @@ function aviso(t, tipo = "bien") {
   if (t) setTimeout(() => { if (m.textContent === t) m.innerHTML = ""; }, 9000);
 }
 
-// ------------------------------------------------------------ entrar
+// ------------------------------------------------------------ entrar / salir
+// Se entra desde la página principal (la misma de los clientes): si lo que se escribe
+// es la clave del panel, esa página la guarda en esta pestaña y manda aquí.
 
-$("fClave").addEventListener("submit", async ev => {
-  ev.preventDefault();
-  clave = $("clave").value.trim();
-  const boton = $("fClave").querySelector("button");
-  if (boton.disabled) return;
-  boton.disabled = true;
-  try { await cargar(); Comun.guardar("clave", clave); $("clave").value = ""; } catch (e) { if (e.message !== "401") { $("errClave").textContent = e.message; $("errClave").classList.remove("oculto"); } }
-  finally { boton.disabled = false; }
-});
 $("salir").addEventListener("click", () => salir());
 $("recargar").addEventListener("click", () => cargar());
 
-function salir(motivo) {
+function salir() {
   Comun.guardar("clave", null); clave = null;
-  $("clave").value = "";
-  $("vPanel").classList.add("oculto"); $("vClave").classList.remove("oculto");
-  if (motivo) { $("errClave").textContent = motivo; $("errClave").classList.remove("oculto"); }
+  location.replace("/");
 }
 
 document.querySelectorAll(".pestanas button").forEach(b => b.addEventListener("click", () => {
@@ -53,7 +44,6 @@ document.querySelectorAll(".pestanas button").forEach(b => b.addEventListener("c
 
 async function cargar() {
   R = await api("GET", "resumen");
-  $("vClave").classList.add("oculto"); $("errClave").classList.add("oculto");
   $("vPanel").classList.remove("oculto");
   for (const m of new Set(R.perfiles.map(p => p.mundo))) if (!lays[m]) lays[m] = await Comun.datos(m);
   pintarEnvios(); pintarPerfiles(); pintarHistorial();
@@ -215,4 +205,5 @@ function pintarHistorial() {
       el("td", { class: "chico apagado" }, e.nota || "")));
 }
 
-if (clave) cargar().catch(() => {});
+if (!clave) location.replace("/");
+else cargar().catch(e => { if (e.message !== "401") aviso(e.message, "mal"); });

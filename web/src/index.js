@@ -170,10 +170,13 @@ async function clienteDe(req, env) {
   return per;
 }
 
+// Una sola entrada para todos: la clave del panel lleva al panel; un código, a su perfil.
 async function entrar(req, env) {
   await limitar(req, env);
   const { codigo } = await req.json().catch(() => ({}));
-  const per = await perfilPorCodigo(env, codigo);
+  const texto = String(codigo || "").trim();
+  if (env.ADMIN_CLAVE && iguales(texto, String(env.ADMIN_CLAVE).trim())) return json({ admin: true });
+  const per = /^\d{4,8}$/.test(texto) ? await perfilPorCodigo(env, texto) : null;
   if (!per) { await esperar(600); fallo("Código no válido", 401); }
   return datosCliente(env, per);
 }

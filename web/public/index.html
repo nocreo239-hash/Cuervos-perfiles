@@ -21,7 +21,10 @@
     <h2>Pon tu código</h2>
     <p class="apagado chico">Es el mismo número que vas a poner en el teclado del mapa.</p>
     <form id="fEntrada">
-      <input id="codigo" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="••••••••" aria-label="Código">
+      <div style="position:relative">
+        <input id="codigo" type="password" style="padding-left:74px; padding-right:74px" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="64" placeholder="••••••••" aria-label="Código">
+        <button id="ver" type="button" class="chico" style="position:absolute; right:6px; top:50%; transform:translateY(-50%); padding:6px 10px; width:auto; margin:0">Ver</button>
+      </div>
       <button class="primario" type="submit">Entrar</button>
     </form>
     <div id="errEntrada" class="aviso mal oculto"></div>
