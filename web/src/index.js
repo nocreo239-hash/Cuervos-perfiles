@@ -110,6 +110,8 @@ async function prepararDB(env) {
   ]);
   // columna añadida después: cuadros que el dueño no aprobó de un envío
   try { await env.DB.prepare("ALTER TABLE envios ADD COLUMN rechazados TEXT").run(); } catch (e) { /* ya existe */ }
+  // cuadros del perfil que tienen una foto aprobada (los demás muestran el logo)
+  try { await env.DB.prepare("ALTER TABLE perfiles ADD COLUMN aprobados TEXT").run(); } catch (e) { /* ya existe */ }
   _lista = true;
 }
 
@@ -123,6 +125,7 @@ async function api(req, env, url) {
   if (p === "/api/estado" && m === "GET") return estado(req, env);
   if (p === "/api/envio" && m === "POST") return enviar(req, env);
   if (p.startsWith("/api/envio/hoja/") && m === "GET") return hojaPropia(req, env, +p.split("/").pop());
+  if (p.startsWith("/api/publicada/") && m === "GET") { const per = await clienteDe(req, env); return hojaPublicada(env, per.id, +p.split("/").pop()); }
 
   // ---- admin
   if (p.startsWith("/api/admin/")) {
@@ -135,6 +138,7 @@ async function api(req, env, url) {
     if (r[0] === "perfil" && r[2] === "codigo" && m === "POST") return nuevoCodigo(env, +r[1]);
     if (r[0] === "perfil" && r[2] === "editar" && m === "POST") return editarPerfil(req, env, +r[1]);
     if (r[0] === "envio" && r[2] === "hoja" && m === "GET") return hojaEnvio(env, +r[1], +r[3]);
+    if (r[0] === "perfil" && r[2] === "publicada" && m === "GET") return hojaPublicada(env, +r[1], +r[3]);
     if (r[0] === "envio" && r[2] === "aprobar" && m === "POST") return aprobar(req, env, +r[1]);
     if (r[0] === "envio" && r[2] === "rechazar" && m === "POST") return rechazar(req, env, +r[1]);
     if (r[0] === "lista" && m === "POST") return json({ ok: true, cambio: await publicarLista(env, "casa", "Lista rehecha a mano") });
@@ -192,6 +196,7 @@ async function datosCliente(env, per) {
   const ult = await env.DB.prepare("SELECT id, estado, espacios, rechazados, creado, revisado, nota FROM envios WHERE perfil = ? ORDER BY id DESC LIMIT 1").bind(per.id).first();
   return json({
     perfil: per.id, mundo: per.mundo, vence: per.vence, publicado: per.publicado,
+    aprobados: per.aprobados ? JSON.parse(per.aprobados) : null,
     hojas: (env.PAGES_BASE || "") + `${per.mundo}/p/${String(per.id).padStart(4, "0")}_`,
     ultimo: ult ? { ...ult, espacios: JSON.parse(ult.espacios), rechazados: JSON.parse(ult.rechazados || "[]") } : null,
   });
@@ -224,6 +229,13 @@ async function enviar(req, env) {
   for (let h = 0; h < cfg.hojas; h++)
     await env.ENVIOS.put(`envios/${id}_${h}.jpg`, hojas[h], { httpMetadata: { contentType: "image/jpeg" } });
   return json({ ok: true, envio: id });
+}
+
+/** Lo último que se aprobó de un perfil (copia en R2; 404 si es de antes de guardar copias). */
+async function hojaPublicada(env, perfil, h) {
+  const o = await env.ENVIOS.get(`publicadas/${perfil}_${h}.jpg`);
+  if (!o) fallo("Sin copia", 404);
+  return new Response(o.body, { headers: { "content-type": "image/jpeg", "cache-control": "private, no-store" } });
 }
 
 /** El cliente ve sus propias hojas pendientes (para recordar qué mandó y dónde). */
@@ -352,6 +364,14 @@ async function aprobar(req, env, id) {
   }
   await env.DB.prepare("UPDATE envios SET estado = 'aprobado', revisado = ?, rechazados = ?, nota = ? WHERE id = ?")
     .bind(ahora(), rechazados.length ? JSON.stringify(rechazados) : null, rechazados.length ? nota : null, id).run();
+  // copia propia de lo publicado: GitHub Pages tarda unos minutos en servir lo nuevo, y lo que se
+  // arme después (otro envío, otro rechazo) tiene que partir de esto y no de una versión vieja
+  for (let h = 0; h < cfg.hojas; h++)
+    await env.ENVIOS.put(`publicadas/${e.perfil}_${h}.jpg`, hojas[h], { httpMetadata: { contentType: "image/jpeg" } });
+  const per = await env.DB.prepare("SELECT aprobados FROM perfiles WHERE id = ?").bind(e.perfil).first();
+  const ya = new Set(per && per.aprobados ? JSON.parse(per.aprobados) : []);
+  for (const n of espacios) if (!rechazados.includes(n)) ya.add(n);
+  await env.DB.prepare("UPDATE perfiles SET aprobados = ? WHERE id = ?").bind(JSON.stringify([...ya].sort((a, b) => a - b)), e.perfil).run();
   for (let h = 0; h < cfg.hojas; h++) await env.ENVIOS.delete(`envios/${id}_${h}.jpg`);
   return json({ ok: true, rechazados });
 }

@@ -10,6 +10,7 @@ let lay = null;         // layout del mundo (espacios con su hoja y rectángulo)
 const elegidas = {};    // id -> { img, z, cx, cy }
 let pendientes = null;  // hojas del envío que espera revisión: [url0, url1], o null
 let enRevision = [];    // cuadros de ese envío
+let publicadas = null;  // hojas de lo último aprobado (copia del servidor, sin esperar a GitHub)
 
 // ------------------------------------------------------------ entrar / salir
 
@@ -68,6 +69,20 @@ async function refrescar() {
 
 /** Si hay un envío esperando revisión, baja sus hojas para mostrar qué foto quedó en cada cuadro. */
 async function cargarPendientes() {
+  // lo aprobado: copia del servidor; si no hay (perfiles viejos), se usa GitHub Pages
+  if (publicadas) publicadas.forEach(u => URL.revokeObjectURL(u));
+  publicadas = null;
+  if (info.publicado) {
+    try {
+      const urls = [];
+      for (let h = 0; h < lay.hojas; h++) {
+        const r = await fetch(`/api/publicada/${h}`, { headers: { "x-codigo": codigo } });
+        if (!r.ok) { urls.forEach(u => URL.revokeObjectURL(u)); urls.length = 0; break; }
+        urls.push(URL.createObjectURL(await r.blob()));
+      }
+      if (urls.length === lay.hojas) publicadas = urls;
+    } catch (e) { publicadas = null; }
+  }
   if (pendientes) pendientes.forEach(u => URL.revokeObjectURL(u));
   pendientes = null; enRevision = [];
   const u = info.ultimo;
@@ -123,7 +138,13 @@ function pintarPlano() {
     }, String(e.id)));
 }
 
-function urlHoja(h) { return `${info.hojas}${h}.jpg?v=${encodeURIComponent(info.publicado || "")}`; }
+function urlHoja(h) { return publicadas ? publicadas[h] : `${info.hojas}${h}.jpg?v=${encodeURIComponent(info.publicado || "")}`; }
+
+/** Este cuadro tiene una foto aprobada (ya está en el mapa). */
+function aprobada(id) {
+  if (!info.publicado) return false;
+  return info.aprobados ? info.aprobados.includes(id) : true;   // perfiles de antes: todo lo publicado
+}
 
 function forma(e) {
   const r = e.w / e.h;
@@ -141,22 +162,30 @@ function tarjeta(e) {
   const espera = !sel && pendientes && enRevision.includes(e.id);
   if (sel) vista.append(previa(e, sel));
   else if (espera) vista.append(Comun.recorte(pendientes[e.hoja], e, lay.tam, 200, 330));
-  else if (info.publicado) vista.append(Comun.recorte(urlHoja(e.hoja), e, lay.tam, 200, 330));
+  else if (aprobada(e.id)) vista.append(Comun.recorte(urlHoja(e.hoja), e, lay.tam, 200, 330));
   else vista.append(el("div", { class: "vacio" }, "Todavía sin foto. Si lo dejas así, se verá con el logo del club."));
+  const yaEnMapa = aprobada(e.id);
+  const rechazada = !sel && !espera && noAprobado(e.id);
+  const nota = sel && yaEnMapa ? "Este cuadro ya tiene una foto en el mapa. Si aprueban la nueva, la reemplaza; si no, se queda la de ahora."
+    : rechazada && yaEnMapa ? "La última foto que mandaste para este cuadro no se aprobó. Se quedó esta, que ya está en el mapa."
+    : !sel && !espera && yaEnMapa ? "Esta foto ya está en el mapa. Si mandas otra para este cuadro y se aprueba, la reemplaza."
+    : null;
 
   const t = el("article", { class: "espacio" + (sel ? " lista" : espera ? " espera" : ""), id: "esp" + e.id },
     el("div", { class: "cab" },
       el("span", { class: "num" }, String(e.id)),
       sel ? el("span", { class: "etiqueta nueva" }, "Nueva")
         : espera ? el("span", { class: "etiqueta espera" }, "Esperando revisión")
-        : noAprobado(e.id) ? el("span", { class: "etiqueta no" }, "No aprobada")
-        : el("span", { class: "forma" }, forma(e) + (info.publicado ? " · la de ahora" : ""))),
+        : yaEnMapa ? el("span", { class: "etiqueta si" }, "Aprobada · en el mapa")
+        : rechazada ? el("span", { class: "etiqueta no" }, "No aprobada")
+        : el("span", { class: "forma" }, forma(e))),
     vista,
+    nota ? el("div", { class: "nota-cuadro" }, nota) : null,
     el("div", { class: "lugar" },
       el("img", { src: "/" + e.foto, alt: "Dónde está el cuadro " + e.id, onclick: () => verGrande("/" + e.foto) }),
       el("span", {}, "Así se ve hoy en el club (sin perfil)")),
     el("div", { class: "acciones" },
-      el("button", { type: "button", onclick: () => elegir(e) }, sel ? "Cambiar foto" : "Elegir foto"),
+      el("button", { type: "button", onclick: () => elegir(e) }, sel || yaEnMapa ? "Cambiar foto" : "Elegir foto"),
       sel ? el("button", { type: "button", onclick: () => abrirEditor(e, sel.img, sel) }, "Ajustar") : null,
       sel ? el("button", { type: "button", class: "peligro", onclick: () => { delete elegidas[e.id]; refrescarTarjeta(e); } }, "Quitar") : null));
 
@@ -294,8 +323,8 @@ async function armarHoja(h) {
     if (!base) throw new Error("No pude cargar las fotos que tienes en revisión. Recarga la página e intenta otra vez.");
     ctx.drawImage(base, 0, 0, lay.tam, lay.tam);
   } else if (info.publicado) {
-    // lo que no cambia se queda como está ahora
-    const base = await Comun.imagen(`${info.hojas}${h}.jpg?t=${Date.now()}`, true);
+    // lo que no cambia se queda como está ahora (la copia del servidor, o GitHub si no hay)
+    const base = await Comun.imagen(publicadas ? publicadas[h] : `${info.hojas}${h}.jpg?t=${Date.now()}`, !publicadas);
     if (!base) throw new Error("No pude cargar tus fotos actuales para conservar las que no cambias. Intenta otra vez en un momento.");
     ctx.drawImage(base, 0, 0, lay.tam, lay.tam);
   } else {
@@ -315,6 +344,8 @@ $("enviar").addEventListener("click", async () => {
   if (!ids.length) return;
   const b = $("enviar"); b.disabled = true; b.textContent = "Preparando...";
   try {
+    // lo último del servidor (quizá ya aprobaron o rechazaron algo mientras la página estaba abierta)
+    await refrescar();
     await document.fonts.ready;
     const f = new FormData();
     f.append("espacios", JSON.stringify([...new Set([...ids, ...enRevision])].sort((a, b) => a - b)));

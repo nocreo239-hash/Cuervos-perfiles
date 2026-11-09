@@ -59,6 +59,15 @@ async function cargar() {
 
 // ------------------------------------------------------------ envíos por aprobar
 
+async function hojaPublicadaAdmin(perfil, h) {
+  try {
+    const r = await fetch(`/api/admin/perfil/${perfil}/publicada/${h}`, { headers: { authorization: "Bearer " + clave } });
+    if (!r.ok) return null;
+    const u = URL.createObjectURL(await r.blob()); urls.push(u);
+    return await Comun.imagen(u);
+  } catch (e) { return null; }
+}
+
 async function hojaPendiente(id, h) {
   const r = await api("GET", `envio/${id}/hoja/${h}`);
   const u = URL.createObjectURL(await r.blob());
@@ -79,6 +88,15 @@ async function tarjetaEnvio(e) {
   const nuevas = [];
   for (let h = 0; h < lay.hojas; h++) nuevas.push(await hojaPendiente(e.id, h));
   const urlAhora = per && per.publicado ? h => `${R.pagesBase}${e.mundo}/p/${String(e.perfil).padStart(4, "0")}_${h}.jpg?v=${encodeURIComponent(per.publicado)}` : null;
+  // para mostrar "ahora": la copia del servidor si existe (GitHub tarda unos minutos en actualizarse)
+  const copias = [];
+  if (urlAhora) for (let h = 0; h < lay.hojas; h++) {
+    try {
+      const r = await fetch(`/api/admin/perfil/${e.perfil}/publicada/${h}`, { headers: { authorization: "Bearer " + clave } });
+      if (r.ok) { const u = URL.createObjectURL(await r.blob()); urls.push(u); copias[h] = u; }
+    } catch (x) { /* se usa GitHub */ }
+  }
+  const verAhora = h => copias[h] || urlAhora(h);
 
   const cambiados = lay.espacios.filter(s => e.espacios.includes(s.id));
   const iguales = lay.espacios.filter(s => !e.espacios.includes(s.id));
@@ -115,7 +133,7 @@ async function tarjetaEnvio(e) {
         el("b", { style: "color:var(--oro)" }, String(s.id)), cambio ? el("span", { class: "etiqueta nueva" }, "Nueva") : el("span", { class: "etiqueta" }, "igual")),
       el("div", { class: "par" },
         el("div", {}, Comun.recorte(nuevas[s.hoja], s, lay.tam, 110), el("div", {}, cambio ? "nueva" : "")),
-        cambio && urlAhora ? el("div", {}, Comun.recorte(urlAhora(s.hoja), s, lay.tam, 70), el("div", {}, "ahora")) : null),
+        cambio && urlAhora ? el("div", {}, Comun.recorte(verAhora(s.hoja), s, lay.tam, 70), el("div", {}, "ahora")) : null),
       cambio ? el("div", { class: "fila", style: "margin-top:8px; gap:6px; flex-wrap:nowrap" }, si, nob) : null);
     return c;
   };
@@ -133,7 +151,8 @@ async function tarjetaEnvio(e) {
       if (rech.length) {
         let base = null;
         if (urlAhora) {
-          base = await Comun.imagen(urlAhora(h).replace(/\?v=.*$/, "?t=" + Date.now()), true);
+          // la copia del servidor de lo último aprobado; si no hay, GitHub Pages
+          base = await hojaPublicadaAdmin(e.perfil, h) || await Comun.imagen(urlAhora(h).replace(/\?v=.*$/, "?t=" + Date.now()), true);
           if (!base) throw new Error("No pude cargar las fotos publicadas para devolver los cuadros rechazados. Intenta otra vez.");
         }
         await document.fonts.ready;

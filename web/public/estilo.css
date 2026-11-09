@@ -101,6 +101,8 @@ button:disabled { opacity: .5; cursor: default; }
 .espacio.espera { border-color: #8a6a2c; }
 .plano .punto.espera { background: #4a3810; border-color: #f0c66a; color: #fff3d6; }
 .etiqueta.no { background: #2a1116; border-color: #6b2730; color: #ffb3b3; }
+.etiqueta.si { background: #12221a; border-color: #2f5e40; color: #a6e6bc; }
+.espacio .nota-cuadro { padding: 6px 10px 8px; font-size: 12px; color: var(--apagado); border-top: 1px solid var(--linea); }
 .etiqueta.nueva { background: var(--rojo); border-color: var(--rojo); color: #fff; }
 
 /* barra de abajo */
