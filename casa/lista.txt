@@ -1,0 +1,3 @@
+# cifrado numero  (FNV-1a 64 de 'sal:codigo'; los códigos no se guardan aquí)
+426c8292b9aa9859 0
+f1b4607d152e9e79 1
