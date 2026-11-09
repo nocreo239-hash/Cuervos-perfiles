@@ -19,6 +19,14 @@ async function api(metodo, ruta, cuerpo) {
   return d;
 }
 
+async function apiForm(ruta, form) {
+  const r = await fetch("/api/admin/" + ruta, { method: "POST", headers: { authorization: "Bearer " + clave }, body: form });
+  if (r.status === 401) { salir(); throw new Error("401"); }
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "Error " + r.status);
+  return d;
+}
+
 function aviso(t, tipo = "bien") {
   const m = $("msg"); m.innerHTML = "";
   if (t) m.append(el("div", { class: "aviso " + tipo }, t));
@@ -70,42 +78,112 @@ async function tarjetaEnvio(e) {
   const lay = lays[e.mundo], per = R.perfiles.find(p => p.id === e.perfil);
   const nuevas = [];
   for (let h = 0; h < lay.hojas; h++) nuevas.push(await hojaPendiente(e.id, h));
-  const ahora = per && per.publicado ? h => `${R.pagesBase}${e.mundo}/p/${String(e.perfil).padStart(4, "0")}_${h}.jpg?v=${encodeURIComponent(per.publicado)}` : null;
-
-  const celda = (s, cambio) => el("div", { class: "celda" + (cambio ? " cambio" : "") },
-    el("div", { class: "fila", style: "justify-content:space-between; margin-bottom:6px" },
-      el("b", { style: "color:var(--oro)" }, String(s.id)), cambio ? el("span", { class: "etiqueta nueva" }, "Nueva") : el("span", { class: "etiqueta" }, "igual")),
-    el("div", { class: "par" },
-      el("div", {}, Comun.recorte(nuevas[s.hoja], s, lay.tam, 110), el("div", {}, cambio ? "nueva" : "")),
-      cambio && ahora ? el("div", {}, Comun.recorte(ahora(s.hoja), s, lay.tam, 70), el("div", {}, "ahora")) : null));
+  const urlAhora = per && per.publicado ? h => `${R.pagesBase}${e.mundo}/p/${String(e.perfil).padStart(4, "0")}_${h}.jpg?v=${encodeURIComponent(per.publicado)}` : null;
 
   const cambiados = lay.espacios.filter(s => e.espacios.includes(s.id));
   const iguales = lay.espacios.filter(s => !e.espacios.includes(s.id));
+  const no = new Set();   // cuadros que el dueño rechaza
+
   const motivo = el("textarea", { rows: 2, placeholder: "Motivo (lo verá el cliente)", class: "oculto", style: "margin-top:10px" });
+  const resumenTxt = el("div", { class: "chico apagado", style: "margin-top:10px" });
+  const publicar = el("button", { class: "primario", type: "button" });
+  const rechazarTodo = el("button", { type: "button" }, "Rechazar todo");
 
-  const aprobar = el("button", { class: "primario", type: "button" }, "Aprobar y publicar");
-  const rechazar = el("button", { type: "button" }, "Rechazar");
-  aprobar.onclick = async () => {
-    aprobar.disabled = rechazar.disabled = true; aprobar.textContent = "Publicando...";
-    try { await api("POST", `envio/${e.id}/aprobar`); aviso(`Perfil ${e.perfil} publicado. Sale en las instancias nuevas en unos minutos.`); await cargar(); }
-    catch (x) { aviso(x.message, "mal"); aprobar.disabled = rechazar.disabled = false; aprobar.textContent = "Aprobar y publicar"; }
+  function actualizar() {
+    const si = cambiados.length - no.size;
+    publicar.textContent = no.size === 0 ? "Aprobar y publicar todo" : si === 0 ? "Rechazar todo" : `Publicar las aprobadas (${si})`;
+    publicar.classList.toggle("primario", si > 0);
+    motivo.classList.toggle("oculto", no.size === 0 && !motivo.dataset.abierto);
+    resumenTxt.textContent = no.size === 0 ? "" :
+      `Se ${si === 1 ? "publica el cuadro" : "publican los cuadros"} ${cambiados.filter(s => !no.has(s.id)).map(s => s.id).join(", ") || "—"}. ` +
+      `${no.size === 1 ? "El cuadro" : "Los cuadros"} ${[...no].join(", ")} ${no.size === 1 ? "se queda" : "se quedan"} como ${per && per.publicado ? "estaba" + (no.size === 1 ? "" : "n") : "logo del club"}.`;
+  }
+
+  const celda = (s, cambio) => {
+    const c = el("div", { class: "celda" + (cambio ? " cambio" : "") });
+    const si = el("button", { type: "button", class: "chico activa-si" }, "Aprobar");
+    const nob = el("button", { type: "button", class: "chico" }, "Rechazar");
+    const marcar = rechazado => {
+      rechazado ? no.add(s.id) : no.delete(s.id);
+      c.classList.toggle("rechazada", rechazado);
+      si.classList.toggle("activa-si", !rechazado); nob.classList.toggle("activa-no", rechazado);
+      actualizar();
+    };
+    si.onclick = () => marcar(false); nob.onclick = () => marcar(true);
+    c.append(
+      el("div", { class: "fila", style: "justify-content:space-between; margin-bottom:6px" },
+        el("b", { style: "color:var(--oro)" }, String(s.id)), cambio ? el("span", { class: "etiqueta nueva" }, "Nueva") : el("span", { class: "etiqueta" }, "igual")),
+      el("div", { class: "par" },
+        el("div", {}, Comun.recorte(nuevas[s.hoja], s, lay.tam, 110), el("div", {}, cambio ? "nueva" : "")),
+        cambio && urlAhora ? el("div", {}, Comun.recorte(urlAhora(s.hoja), s, lay.tam, 70), el("div", {}, "ahora")) : null),
+      cambio ? el("div", { class: "fila", style: "margin-top:8px; gap:6px; flex-wrap:nowrap" }, si, nob) : null);
+    return c;
   };
-  rechazar.onclick = async () => {
-    if (motivo.classList.contains("oculto")) { motivo.classList.remove("oculto"); motivo.focus(); rechazar.textContent = "Confirmar rechazo"; return; }
-    rechazar.disabled = aprobar.disabled = true;
+
+  // Rehace las hojas: lo del cliente, pero en los rechazados vuelve la foto de antes (o el logo).
+  async function hojasSinRechazados() {
+    const hojas = [];
+    for (let h = 0; h < lay.hojas; h++) {
+      const c = document.createElement("canvas"); c.width = c.height = lay.tam;
+      const ctx = c.getContext("2d");
+      const img = await Comun.imagen(nuevas[h]);
+      if (!img) throw new Error("No pude abrir las fotos del envío");
+      ctx.drawImage(img, 0, 0, lay.tam, lay.tam);
+      const rech = lay.espacios.filter(s => s.hoja === h && no.has(s.id));
+      if (rech.length) {
+        let base = null;
+        if (urlAhora) {
+          base = await Comun.imagen(urlAhora(h).replace(/\?v=.*$/, "?t=" + Date.now()), true);
+          if (!base) throw new Error("No pude cargar las fotos publicadas para devolver los cuadros rechazados. Intenta otra vez.");
+        }
+        await document.fonts.ready;
+        for (const s of rech) base ? ctx.drawImage(base, s.x, s.y, s.w, s.h, s.x, s.y, s.w, s.h) : Comun.relleno(ctx, s);
+      }
+      hojas.push(await Comun.jpeg(c));
+    }
+    return hojas;
+  }
+
+  const bloquear = v => { publicar.disabled = rechazarTodo.disabled = v; };
+
+  publicar.onclick = async () => {
+    if (no.size === cambiados.length) return rechazarTodo.onclick(true);
+    bloquear(true); publicar.textContent = "Publicando...";
+    try {
+      if (no.size === 0) await api("POST", `envio/${e.id}/aprobar`);
+      else {
+        const f = new FormData();
+        (await hojasSinRechazados()).forEach((b, h) => f.append("hoja" + h, b, `hoja${h}.jpg`));
+        f.append("rechazados", JSON.stringify([...no]));
+        f.append("nota", motivo.value.trim());
+        await apiForm(`envio/${e.id}/aprobar`, f);
+      }
+      aviso(`Perfil ${e.perfil} publicado${no.size ? ` sin ${no.size === 1 ? "el cuadro" : "los cuadros"} ${[...no].join(", ")}` : ""}. Sale en las instancias nuevas en unos minutos.`);
+      await cargar();
+    } catch (x) { aviso(x.message, "mal"); bloquear(false); actualizar(); }
+  };
+
+  rechazarTodo.onclick = async directo => {
+    if (directo !== true && !motivo.dataset.abierto) {
+      motivo.dataset.abierto = "1"; motivo.classList.remove("oculto"); motivo.focus();
+      rechazarTodo.textContent = "Confirmar rechazo de todo"; return;
+    }
+    bloquear(true);
     try { await api("POST", `envio/${e.id}/rechazar`, { nota: motivo.value.trim() }); aviso(`Envío del perfil ${e.perfil} rechazado.`, "espera"); await cargar(); }
-    catch (x) { aviso(x.message, "mal"); rechazar.disabled = aprobar.disabled = false; }
+    catch (x) { aviso(x.message, "mal"); bloquear(false); }
   };
 
+  actualizar();
   return el("div", { class: "panel" },
     el("div", { class: "fila", style: "justify-content:space-between" },
       el("div", {},
         el("h2", { style: "margin:0" }, `Perfil ${e.perfil} · ${e.nombre}`),
         el("div", { class: "apagado chico" }, `Mandado el ${Comun.fecha(e.creado)} · cambió ${cambiados.length === 1 ? "el cuadro" : "los cuadros"} ${e.espacios.join(", ")}` + (per && per.publicado ? "" : " · primera vez (los que no mandó salen con el logo)"))),
-      el("div", { class: "fila" }, rechazar, aprobar)),
-    motivo,
+      el("div", { class: "fila" }, rechazarTodo, publicar)),
     el("h3", { style: "margin-top:14px" }, "Lo que cambia"),
+    el("p", { class: "chico apagado", style: "margin:0 0 8px" }, "Todas empiezan aprobadas. Toca «Rechazar» en las que no pueden estar."),
     el("div", { class: "comparar" }, cambiados.map(s => celda(s, true))),
+    resumenTxt, motivo,
     iguales.length ? el("details", { style: "margin-top:12px" },
       el("summary", { class: "apagado chico", style: "cursor:pointer" }, `Ver los otros ${iguales.length} cuadros (se quedan como están)`),
       el("div", { class: "comparar", style: "margin-top:10px" }, iguales.map(s => celda(s, false)))) : null);
@@ -201,7 +279,7 @@ function pintarHistorial() {
   for (const e of R.envios)
     t.append(el("tr", {},
       el("td", {}, "#" + e.id), el("td", {}, `${e.perfil} · ${e.nombre}`), el("td", {}, e.espacios.join(", ")),
-      el("td", { class: "chico" }, Comun.fecha(e.creado)), el("td", {}, el("span", { class: "etiqueta" + (e.estado === "pendiente" ? " nueva" : "") }, e.estado)),
+      el("td", { class: "chico" }, Comun.fecha(e.creado)), el("td", {}, el("span", { class: "etiqueta" + (e.estado === "pendiente" ? " nueva" : "") }, e.estado + (e.rechazados && e.rechazados.length ? ` (sin ${e.rechazados.join(", ")})` : ""))),
       el("td", { class: "chico apagado" }, e.nota || "")));
 }
 

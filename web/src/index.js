@@ -108,6 +108,8 @@ async function prepararDB(env) {
     env.DB.prepare(`INSERT OR IGNORE INTO perfiles (id, mundo, nombre, cifrado, creado, activo, publicado, nota)
       VALUES (0, 'casa', 'Prueba A', '426c8292b9aa9859', ?1, 1, ?1, 'prueba'), (1, 'casa', 'Prueba B', 'f1b4607d152e9e79', ?1, 1, ?1, 'prueba')`).bind(ahora()),
   ]);
+  // columna añadida después: cuadros que el dueño no aprobó de un envío
+  try { await env.DB.prepare("ALTER TABLE envios ADD COLUMN rechazados TEXT").run(); } catch (e) { /* ya existe */ }
   _lista = true;
 }
 
@@ -133,7 +135,7 @@ async function api(req, env, url) {
     if (r[0] === "perfil" && r[2] === "codigo" && m === "POST") return nuevoCodigo(env, +r[1]);
     if (r[0] === "perfil" && r[2] === "editar" && m === "POST") return editarPerfil(req, env, +r[1]);
     if (r[0] === "envio" && r[2] === "hoja" && m === "GET") return hojaEnvio(env, +r[1], +r[3]);
-    if (r[0] === "envio" && r[2] === "aprobar" && m === "POST") return aprobar(env, +r[1]);
+    if (r[0] === "envio" && r[2] === "aprobar" && m === "POST") return aprobar(req, env, +r[1]);
     if (r[0] === "envio" && r[2] === "rechazar" && m === "POST") return rechazar(req, env, +r[1]);
     if (r[0] === "lista" && m === "POST") return json({ ok: true, cambio: await publicarLista(env, "casa", "Lista rehecha a mano") });
   }
@@ -187,11 +189,11 @@ async function estado(req, env) { return datosCliente(env, await clienteDe(req, 
 async function datosCliente(env, per) {
   if (!per.activo) fallo("Este perfil está desactivado. Habla con el dueño del mapa.", 403);
   if (per.vence && per.vence < hoy()) fallo("Este perfil venció el " + per.vence + ".", 403);
-  const ult = await env.DB.prepare("SELECT id, estado, espacios, creado, revisado, nota FROM envios WHERE perfil = ? ORDER BY id DESC LIMIT 1").bind(per.id).first();
+  const ult = await env.DB.prepare("SELECT id, estado, espacios, rechazados, creado, revisado, nota FROM envios WHERE perfil = ? ORDER BY id DESC LIMIT 1").bind(per.id).first();
   return json({
     perfil: per.id, mundo: per.mundo, vence: per.vence, publicado: per.publicado,
     hojas: (env.PAGES_BASE || "") + `${per.mundo}/p/${String(per.id).padStart(4, "0")}_`,
-    ultimo: ult ? { ...ult, espacios: JSON.parse(ult.espacios) } : null,
+    ultimo: ult ? { ...ult, espacios: JSON.parse(ult.espacios), rechazados: JSON.parse(ult.rechazados || "[]") } : null,
   });
 }
 
@@ -242,7 +244,7 @@ async function resumen(env) {
       FROM perfiles p ORDER BY p.id`).all()).results;
   const envios = (await env.DB.prepare(`SELECT e.*, p.nombre, p.mundo FROM envios e JOIN perfiles p ON p.id = e.perfil
       WHERE e.estado = 'pendiente' OR e.id IN (SELECT id FROM envios ORDER BY id DESC LIMIT 15) ORDER BY e.id DESC`).all()).results
-    .map(e => ({ ...e, espacios: JSON.parse(e.espacios) }));
+    .map(e => ({ ...e, espacios: JSON.parse(e.espacios), rechazados: JSON.parse(e.rechazados || "[]") }));
   return json({ perfiles, envios, hoy: hoy(), pagesBase: env.PAGES_BASE || "", maximo: PERFILES_MAX });
 }
 
@@ -306,24 +308,52 @@ async function hojaEnvio(env, id, h) {
   return new Response(o.body, { headers: { "content-type": "image/jpeg", "cache-control": "private, max-age=3600" } });
 }
 
-async function aprobar(env, id) {
+/**
+ * Aprueba un envío. Sin cuerpo: se publica tal cual lo mandó el cliente.
+ * Con cuerpo (multipart): el panel manda las hojas ya rehechas sin los cuadros
+ * rechazados (esos vuelven a la foto de antes) + 'rechazados' y 'nota'.
+ */
+async function aprobar(req, env, id) {
   const e = await env.DB.prepare("SELECT e.*, p.mundo FROM envios e JOIN perfiles p ON p.id = e.perfil WHERE e.id = ?").bind(id).first();
   if (!e) fallo("No existe ese envío", 404);
   if (e.estado !== "pendiente") fallo("Ese envío ya está " + e.estado);
-  const cfg = MUNDOS[e.mundo];
-  const archivos = [];
-  for (let h = 0; h < cfg.hojas; h++) {
-    const o = await env.ENVIOS.get(`envios/${id}_${h}.jpg`);
-    if (!o) fallo("Falta la hoja " + h + " en R2", 500);
-    archivos.push({ ruta: `${e.mundo}/p/${String(e.perfil).padStart(4, "0")}_${h}.jpg`, base64: b64(await o.arrayBuffer()) });
+  const cfg = MUNDOS[e.mundo], espacios = JSON.parse(e.espacios);
+  let hojas = [], rechazados = [], nota = null;
+  if ((req.headers.get("content-type") || "").includes("multipart/form-data")) {
+    const form = await req.formData();
+    rechazados = JSON.parse(form.get("rechazados") || "[]").map(Number).filter(n => espacios.includes(n));
+    nota = form.get("nota") ? String(form.get("nota")).slice(0, 300) : null;
+    if (rechazados.length >= espacios.length) fallo("Rechazaste todos los cuadros: usa «Rechazar todo»");
+    for (let h = 0; h < cfg.hojas; h++) {
+      const f = form.get("hoja" + h);
+      if (!f || typeof f === "string") fallo("Falta la hoja " + h);
+      const buf = await f.arrayBuffer();
+      const t = tamJpeg(buf);
+      if (!t || t.ancho !== 2048 || t.alto !== 2048 || buf.byteLength > MAX_HOJA_BYTES) fallo("La hoja " + h + " no es válida");
+      hojas.push(buf);
+    }
+  } else {
+    for (let h = 0; h < cfg.hojas; h++) {
+      const o = await env.ENVIOS.get(`envios/${id}_${h}.jpg`);
+      if (!o) fallo("Falta la hoja " + h + " en R2", 500);
+      hojas.push(await o.arrayBuffer());
+    }
   }
+  const archivos = hojas.map((buf, h) => ({ ruta: `${e.mundo}/p/${String(e.perfil).padStart(4, "0")}_${h}.jpg`, base64: b64(buf) }));
   // las hojas y la lista van en el mismo commit
+  const antes = (await env.DB.prepare("SELECT publicado FROM perfiles WHERE id = ?").bind(e.perfil).first()).publicado;
   await env.DB.prepare("UPDATE perfiles SET publicado = ? WHERE id = ?").bind(ahora(), e.perfil).run();
   archivos.push({ ruta: `${e.mundo}/lista.txt`, texto: await textoLista(env, e.mundo) });
-  await commit(env, archivos, `Fotos aprobadas del perfil ${e.perfil}`);
-  await env.DB.prepare("UPDATE envios SET estado = 'aprobado', revisado = ? WHERE id = ?").bind(ahora(), id).run();
+  try {
+    await commit(env, archivos, `Fotos aprobadas del perfil ${e.perfil}`);
+  } catch (x) {
+    await env.DB.prepare("UPDATE perfiles SET publicado = ? WHERE id = ?").bind(antes, e.perfil).run();
+    throw x;
+  }
+  await env.DB.prepare("UPDATE envios SET estado = 'aprobado', revisado = ?, rechazados = ?, nota = ? WHERE id = ?")
+    .bind(ahora(), rechazados.length ? JSON.stringify(rechazados) : null, rechazados.length ? nota : null, id).run();
   for (let h = 0; h < cfg.hojas; h++) await env.ENVIOS.delete(`envios/${id}_${h}.jpg`);
-  return json({ ok: true });
+  return json({ ok: true, rechazados });
 }
 
 async function rechazar(req, env, id) {

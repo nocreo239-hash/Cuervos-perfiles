@@ -85,7 +85,12 @@ button:disabled { opacity: .5; cursor: default; }
 .espacio .num { font-family: "Cinzel", serif; color: var(--oro); font-size: 18px; font-weight: 700; }
 .espacio .forma { color: var(--apagado); font-size: 12px; }
 .espacio .vista { position: relative; background: #0a080a; display: flex; align-items: center; justify-content: center; padding: 10px; height: 230px; }
-.espacio .vista canvas, .espacio .vista .recorte { max-width: 100%; max-height: 100%; border-radius: 3px; box-shadow: 0 0 0 4px #2a1d16, 0 0 0 6px #4a3420; }
+.espacio .vista canvas, .espacio .vista .comparar .celda .fila button { flex: 1; padding: 6px; }
+.comparar .celda button.activa-si { border-color: #3f8a5a; color: #a6e6bc; background: #12221a; }
+.comparar .celda button.activa-no { border-color: var(--rojo-vivo); color: #ffb3b3; background: #2a1116; }
+.comparar .celda.rechazada .par { opacity: .35; filter: grayscale(.8); }
+.comparar .celda.rechazada { border-color: #5a2a30; }
+.recorte { max-width: 100%; max-height: 100%; border-radius: 3px; box-shadow: 0 0 0 4px #2a1d16, 0 0 0 6px #4a3420; }
 .espacio .vacio { color: var(--apagado); font-size: 13px; text-align: center; padding: 0 12px; }
 .espacio .lugar { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-top: 1px solid var(--linea); color: var(--apagado); font-size: 12px; }
 .espacio .lugar img { width: 64px; height: 48px; object-fit: cover; border-radius: 4px; cursor: zoom-in; }
@@ -95,6 +100,7 @@ button:disabled { opacity: .5; cursor: default; }
 .etiqueta.espera { background: #3a2c12; border-color: #8a6a2c; color: #f3d38c; }
 .espacio.espera { border-color: #8a6a2c; }
 .plano .punto.espera { background: #4a3810; border-color: #f0c66a; color: #fff3d6; }
+.etiqueta.no { background: #2a1116; border-color: #6b2730; color: #ffb3b3; }
 .etiqueta.nueva { background: var(--rojo); border-color: var(--rojo); color: #fff; }
 
 /* barra de abajo */
@@ -125,6 +131,11 @@ th { color: var(--apagado); font-weight: 500; font-size: 12px; text-transform: u
 .comparar .celda.cambio { border-color: var(--rojo-vivo); }
 .comparar .par { display: flex; gap: 6px; align-items: flex-end; justify-content: center; min-height: 120px; }
 .comparar .par > div { text-align: center; font-size: 11px; color: var(--apagado); }
+.comparar .celda .fila button { flex: 1; padding: 6px; }
+.comparar .celda button.activa-si { border-color: #3f8a5a; color: #a6e6bc; background: #12221a; }
+.comparar .celda button.activa-no { border-color: var(--rojo-vivo); color: #ffb3b3; background: #2a1116; }
+.comparar .celda.rechazada .par { opacity: .35; filter: grayscale(.8); }
+.comparar .celda.rechazada { border-color: #5a2a30; }
 .recorte { background-repeat: no-repeat; background-color: #0a080a; display: inline-block; }
 
 @media (max-width: 560px) {

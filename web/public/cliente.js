@@ -93,8 +93,16 @@ function pintarEstado() {
     partes.push(el("div", { class: "aviso espera" },
       `Tus fotos del ${Comun.fecha(u.creado)} están esperando revisión: ${u.espacios.length === 1 ? "cuadro" : "cuadros"} ${u.espacios.join(", ")}. `,
       el("span", { class: "chico apagado" }, "Si cambias otros cuadros, se suman a este envío.")));
-  else if (u && u.estado === "aprobado")
-    partes.push(el("div", { class: "aviso bien" }, `Tus fotos se aprobaron el ${Comun.fecha(u.revisado)}. Ya salen en las instancias nuevas que abras con tu código.`));
+  else if (u && u.estado === "aprobado") {
+    const no = u.rechazados || [], si = u.espacios.filter(n => !no.includes(n));
+    partes.push(el("div", { class: "aviso bien" }, no.length
+      ? `Se aprobaron ${si.length === 1 ? "el cuadro" : "los cuadros"} ${si.join(", ")} el ${Comun.fecha(u.revisado)}. Ya salen en las instancias nuevas que abras con tu código.`
+      : `Tus fotos se aprobaron el ${Comun.fecha(u.revisado)}. Ya salen en las instancias nuevas que abras con tu código.`));
+    if (no.length) partes.push(el("div", { class: "aviso mal" },
+      `No se aprobó${no.length === 1 ? " el cuadro" : "n los cuadros"} ${no.join(", ")}: ${no.length === 1 ? "se queda como estaba" : "se quedan como estaban"}.`,
+      u.nota ? el("div", {}, el("b", {}, "Motivo: "), u.nota) : null,
+      el("div", { class: "chico apagado" }, "Puedes mandar otras fotos para esos cuadros.")));
+  }
   else if (u && u.estado === "rechazado")
     partes.push(el("div", { class: "aviso mal" }, `Tus fotos del ${Comun.fecha(u.creado)} no se aprobaron.`, u.nota ? el("div", {}, el("b", {}, "Motivo: "), u.nota) : null, el("div", { class: "chico apagado" }, "Puedes mandar otras.")));
   if (info.vence) partes.push(el("div", { class: "chico apagado", style: "text-align:center; margin-bottom:8px" }, `Tu perfil está activo hasta el ${Comun.fecha(info.vence)}.`));
@@ -141,6 +149,7 @@ function tarjeta(e) {
       el("span", { class: "num" }, String(e.id)),
       sel ? el("span", { class: "etiqueta nueva" }, "Nueva")
         : espera ? el("span", { class: "etiqueta espera" }, "Esperando revisión")
+        : noAprobado(e.id) ? el("span", { class: "etiqueta no" }, "No aprobada")
         : el("span", { class: "forma" }, forma(e) + (info.publicado ? " · la de ahora" : ""))),
     vista,
     el("div", { class: "lugar" },
@@ -160,6 +169,15 @@ function tarjeta(e) {
     if (f) cargarArchivo(e, f);
   });
   return t;
+}
+
+/** El último envío revisado no aprobó este cuadro. */
+function noAprobado(id) {
+  const u = info.ultimo;
+  if (!u) return false;
+  if (u.estado === "rechazado") return u.espacios.includes(id);
+  if (u.estado === "aprobado") return (u.rechazados || []).includes(id);
+  return false;
 }
 
 function refrescarTarjeta(e) {
@@ -265,18 +283,6 @@ lienzo.addEventListener("pointermove", ev => {
 
 // ------------------------------------------------------------ armar las hojas y enviar
 
-function relleno(ctx, e) {
-  const g = ctx.createLinearGradient(e.x, e.y, e.x, e.y + e.h);
-  g.addColorStop(0, "#1b1016"); g.addColorStop(1, "#0b080a");
-  ctx.fillStyle = g; ctx.fillRect(e.x, e.y, e.w, e.h);
-  ctx.strokeStyle = "#5a4227"; ctx.lineWidth = 6; ctx.strokeRect(e.x + 18, e.y + 18, e.w - 36, e.h - 36);
-  ctx.fillStyle = "#c9a464"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  const t = Math.round(Math.min(e.w, e.h) * 0.075);
-  ctx.font = `700 ${t}px Cinzel, Georgia, serif`;
-  ctx.fillText("LA CORTE", e.x + e.w / 2, e.y + e.h / 2 - t * 0.9);
-  ctx.fillText("DE LOS CUERVOS", e.x + e.w / 2, e.y + e.h / 2 + t * 0.5);
-}
-
 async function armarHoja(h) {
   const c = document.createElement("canvas"); c.width = c.height = lay.tam;
   const ctx = c.getContext("2d");
@@ -293,7 +299,7 @@ async function armarHoja(h) {
     if (!base) throw new Error("No pude cargar tus fotos actuales para conservar las que no cambias. Intenta otra vez en un momento.");
     ctx.drawImage(base, 0, 0, lay.tam, lay.tam);
   } else {
-    for (const e of enHoja) relleno(ctx, e);
+    for (const e of enHoja) Comun.relleno(ctx, e);
   }
   for (const e of enHoja) {
     const s = elegidas[e.id]; if (!s) continue;
@@ -301,11 +307,7 @@ async function armarHoja(h) {
     dibujar(t.getContext("2d"), e.w, e.h, s);
     ctx.drawImage(t, e.x, e.y);
   }
-  for (const q of [0.9, 0.82, 0.74]) {
-    const b = await new Promise(r => c.toBlob(r, "image/jpeg", q));
-    if (b && b.size < 5.5 * 1024 * 1024) return b;
-  }
-  throw new Error("Las fotos quedaron demasiado pesadas.");
+  return Comun.jpeg(c);
 }
 
 $("enviar").addEventListener("click", async () => {

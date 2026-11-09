@@ -38,6 +38,28 @@ const Comun = {
     });
   },
 
+  /** Lo que se ve en un cuadro sin foto: fondo oscuro, marco y el nombre del club. */
+  relleno(ctx, e) {
+    const g = ctx.createLinearGradient(e.x, e.y, e.x, e.y + e.h);
+    g.addColorStop(0, "#1b1016"); g.addColorStop(1, "#0b080a");
+    ctx.fillStyle = g; ctx.fillRect(e.x, e.y, e.w, e.h);
+    ctx.strokeStyle = "#5a4227"; ctx.lineWidth = 6; ctx.strokeRect(e.x + 18, e.y + 18, e.w - 36, e.h - 36);
+    ctx.fillStyle = "#c9a464"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const t = Math.round(Math.min(e.w, e.h) * 0.075);
+    ctx.font = `700 ${t}px Cinzel, Georgia, serif`;
+    ctx.fillText("LA CORTE", e.x + e.w / 2, e.y + e.h / 2 - t * 0.9);
+    ctx.fillText("DE LOS CUERVOS", e.x + e.w / 2, e.y + e.h / 2 + t * 0.5);
+  },
+
+  /** Canvas a JPEG, bajando la calidad si pesa demasiado. */
+  async jpeg(c) {
+    for (const q of [0.9, 0.82, 0.74]) {
+      const b = await new Promise(r => c.toBlob(r, "image/jpeg", q));
+      if (b && b.size < 5.5 * 1024 * 1024) return b;
+    }
+    throw new Error("Las fotos quedaron demasiado pesadas.");
+  },
+
   el(tag, attrs = {}, ...hijos) {
     const e = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
