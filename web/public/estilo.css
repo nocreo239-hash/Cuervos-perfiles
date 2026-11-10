@@ -104,6 +104,9 @@ button:disabled { opacity: .5; cursor: default; }
 .etiqueta.si { background: #12221a; border-color: #2f5e40; color: #a6e6bc; }
 .espacio .nota-cuadro { padding: 6px 10px 8px; font-size: 12px; color: var(--apagado); border-top: 1px solid var(--linea); }
 .etiqueta.nueva { background: var(--rojo); border-color: var(--rojo); color: #fff; }
+.espacio .formato { display: flex; gap: 9px; align-items: center; padding: 7px 10px; border-bottom: 1px solid var(--linea); font-size: 12px; color: var(--texto); background: #120d12; }
+.espacio .formato b { color: var(--oro); font-weight: 600; }
+.icono-forma { flex: none; display: inline-block; border: 2px solid var(--oro-suave); border-radius: 2px; box-sizing: border-box; }
 
 /* barra de abajo */
 .barra {

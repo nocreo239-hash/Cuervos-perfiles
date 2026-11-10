@@ -150,6 +150,30 @@ function forma(e) {
   return r > 1.15 ? "horizontal" : r < 0.87 ? "vertical" : "cuadrado";
 }
 
+/** Proporción con números chicos: 0.667 -> "2:3", 1.778 -> "16:9", 1.879 -> "15:8". */
+function proporcion(r) {
+  let mejor = null;
+  for (let q = 1; q <= 16; q++) {
+    const p = Math.round(r * q), err = Math.abs(p / q - r) / r;
+    if (p > 0 && (!mejor || err < mejor.err - 0.004)) mejor = { p, q, err };
+    if (mejor && mejor.err < 0.005) break;
+  }
+  return mejor;
+}
+
+/** Un ejemplo de tamaño con esa forma (el lado largo en unos 1500 px) y lo mínimo para que no se vea borrosa. */
+function formato(e) {
+  const r = e.w / e.h, { p, q } = proporcion(r);
+  const k = p === 16 && q === 9 ? 120 : Math.ceil(1500 / Math.max(p, q));   // 16:9 -> 1920 x 1080
+  const w = p * k, h = q * k;
+  const f = forma(e);
+  return {
+    texto: `${f === "cuadrado" ? "Cuadrada" : f[0].toUpperCase() + f.slice(1)} ${p}:${q}`,
+    ejemplo: `por ejemplo ${w} × ${h} px`,
+    minimo: `mínimo ${e.w} × ${e.h} px`,
+  };
+}
+
 function pintarEspacios() {
   const g = $("rejilla"); g.innerHTML = "";
   for (const e of lay.espacios) g.append(tarjeta(e));
@@ -177,7 +201,8 @@ function tarjeta(e) {
         : espera ? el("span", { class: "etiqueta espera" }, "Esperando revisión")
         : yaEnMapa ? el("span", { class: "etiqueta si" }, "Aprobada · en el mapa")
         : rechazada ? el("span", { class: "etiqueta no" }, "No aprobada")
-        : el("span", { class: "forma" }, forma(e))),
+        : null),   // la forma va en su propia fila, debajo
+    filaFormato(e),
     vista,
     nota ? el("div", { class: "nota-cuadro" }, nota) : null,
     el("div", { class: "lugar" },
@@ -197,6 +222,16 @@ function tarjeta(e) {
     if (f) cargarArchivo(e, f);
   });
   return t;
+}
+
+/** La forma del cuadro, siempre a la vista: un dibujito con su proporción y los tamaños. */
+function filaFormato(e) {
+  const f = formato(e), r = e.w / e.h, k = 22 / Math.max(r, 1);
+  const icono = el("span", { class: "icono-forma", "aria-hidden": "true" });
+  icono.style.width = Math.round(k * r) + "px"; icono.style.height = Math.round(k) + "px";
+  return el("div", { class: "formato", title: "Si tu foto tiene otra forma, lo que no cabe se recorta" },
+    icono,
+    el("span", {}, el("b", {}, f.texto), " · ", f.ejemplo, el("span", { class: "apagado" }, ` (${f.minimo})`)));
 }
 
 /** El último envío revisado no aprobó este cuadro. */
@@ -264,7 +299,16 @@ function abrirEditor(e, img, previo) {
   const s = previo ? { ...previo } : { img, z: 1, cx: img.naturalWidth / 2, cy: img.naturalHeight / 2 };
   ed = { e, s };
   const c = $("edLienzo"); c.width = e.w; c.height = e.h;
-  $("edTitulo").textContent = "Cuadro " + e.id;
+  $("edTitulo").textContent = `Cuadro ${e.id} · ${formato(e).texto}`;
+  // si la foto tiene otra forma, avisar qué se va a recortar
+  const rf = img.naturalWidth / img.naturalHeight, rc = e.w / e.h, dif = rf / rc;
+  const av = $("edAviso");
+  if (dif > 1.12 || dif < 0.89) {
+    const ff = rf > 1.15 ? "horizontal" : rf < 0.87 ? "vertical" : "cuadrada";
+    av.textContent = `Tu foto es ${ff} y este cuadro es ${formato(e).texto.toLowerCase()}: se van a recortar ${dif > 1 ? "los lados" : "arriba y abajo"}. ` +
+      `Mueve la foto para elegir qué parte se ve, o manda una con forma ${proporcion(rc).p}:${proporcion(rc).q} para que salga completa.`;
+    av.classList.remove("oculto");
+  } else av.classList.add("oculto");
   $("edZoom").value = s.z;
   $("velo").classList.remove("oculto");
   pintarEditor();
